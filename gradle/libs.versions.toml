@@ -3,7 +3,7 @@ kotlin = "2.3.21"
 kotlinx-serialization = "1.11.0"
 nimbus-jose-jwt = "10.9"
 bouncycastle = "1.84"
-vanniktechMavenPublish = "0.36.0"
+vanniktechMavenPublish = "0.35.0"
 
 [libraries]
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
