@@ -1,3 +1,4 @@
+import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinJvm
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -34,7 +35,10 @@ mavenPublishing {
 
     signAllPublications()
 
-    configure(KotlinJvm())
+    configure(KotlinJvm(
+        javadocJar = JavadocJar.Empty(),
+        sourcesJar = true,
+    ))
 
     coordinates(group.toString(), "sdjwt-kt", version.toString())
 
