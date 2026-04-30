@@ -31,14 +31,16 @@ dependencies {
 }
 
 mavenPublishing {
+    configure(
+        KotlinJvm(
+            javadocJar = JavadocJar.Empty(),
+            sourcesJar = true,
+        ),
+    )
+
     publishToMavenCentral()
 
     signAllPublications()
-
-    configure(KotlinJvm(
-        javadocJar = JavadocJar.Empty(),
-        sourcesJar = true,
-    ))
 
     coordinates(group.toString(), "sdjwt-kt", version.toString())
 
