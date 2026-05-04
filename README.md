@@ -5,6 +5,8 @@ A production-grade Kotlin/JVM library for **Selective Disclosure JWTs (SD-JWT)**
 SD-JWTs with support for flat, structured, and recursive disclosures, decoy digest padding,
 and Key Binding JWTs.
 
+**Kotlin 2.3.21** | **JVM 11+** | **RFC 9901 Compliant**
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -49,6 +51,7 @@ interfaces to satisfy Dependency Inversion.
 
 | Feature | Description |
 |---|---|
+| **Kotlin 2.3 / JVM 11+** | Built with Kotlin 2.3 and targets JVM 11 |
 | **RFC 9901 Compliant** | Full lifecycle support: issuance, presentation, verification |
 | **Kotlin DSL** | Fluent, type-safe builder for claim concealment configuration |
 | **Three Disclosure Modes** | Flat, Structured, and Recursive selective disclosure |
@@ -68,7 +71,7 @@ build tool:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.b2y4n.vc:verifiable-credentials:1.0.0")
+    implementation("io.github.b2y4n:sdjwt-kt:1.0.0-alpha")
 }
 ```
 
@@ -77,7 +80,7 @@ dependencies {
 ```groovy
 // build.gradle
 dependencies {
-    implementation 'com.b2y4n.vc:verifiable-credentials:1.0.0'
+    implementation 'io.github.b2y4n:sdjwt-kt:1.0.0-alpha'
 }
 ```
 
@@ -85,9 +88,9 @@ dependencies {
 
 ```xml
 <dependency>
-    <groupId>com.b2y4n.vc</groupId>
-    <artifactId>verifiable-credentials</artifactId>
-    <version>1.0.0</version>
+    <groupId>io.github.b2y4n</groupId>
+    <artifactId>sdjwt-kt</artifactId>
+    <version>1.0.0-alpha</version>
 </dependency>
 ```
 
@@ -106,10 +109,10 @@ The library is organized into seven focused packages, each enforcing a single re
 ```
 com.b2y4n.vc.sdjwt
 ├── crypto/          # Hasher interface + SHA-256 implementation
-├── issuer/          # SdJwtIssuer, SdJwtClaims DSL, PayloadConcealer
-├── models/          # SdJwt, Disclosure, ClaimPath, SdJwtPresentation, Constants
+├── issuer/          # SdJwtIssuer, SdJwtClaims DSL, PayloadConcealer, SaltGenerator
+├── models/          # SdJwt, Disclosure, ClaimPath, SdJwtPresentation, SdJwtConstants
 ├── parser/          # SdJwtParser — structural parsing with path resolution
-├── presenter/       # SdJwtPresenter — selective disclosure with Key Binding
+├── presenter/       # SdJwtPresenter, KbJwtSigner — selective disclosure with Key Binding
 ├── utils/           # TimeProvider abstraction for deterministic testing
 └── verifier/        # SdJwtVerifier, PayloadReconstructor, Signature & KB verification
 ```
@@ -118,16 +121,26 @@ All orchestration classes (`SdJwtIssuer`, `SdJwtVerifier`) are **stateless** and
 their dependencies through constructor injection:
 
 ```
-┌──────────────┐        ┌─────────────┐        ┌──────────────┐
+┌──────────────┐        ┌──────────────┐        ┌──────────────┐
 │   Hasher     │◄───────│  SdJwtIssuer │───────►│  JwtSigner   │
-│  (sha-256)   │        │  (stateless) │        │  (interface)  │
+│  (sha-256)   │        │  (stateless) │        │  (interface) │
 └──────────────┘        └──────┬───────┘        └──────────────┘
                                │
                      ┌─────────▼─────────┐
-                     │ PayloadConcealer   │
+                     │ PayloadConcealer  │
                      │ (recursive tree   │
                      │  transformation)  │
                      └───────────────────┘
+
+┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│ SdJwtPresenter  │◄───│  SdJwtVerifier   │───►│ SignatureVerifier│
+│  (KbJwtSigner)  │    │   (stateless)    │    │   (interface)    │
+└─────────────────┘    └────────┬─────────┘    └──────────────────┘
+                                │
+                      ┌─────────▼───────────┐    ┌──────────────────┐
+                      │ PayloadReconstructor│    │KeyBindingVerifier│
+                      │   (usedHashes set)  │    │   (interface)    │
+                      └─────────────────────┘    └──────────────────┘
 ```
 
 ## Use Cases Supported
@@ -426,12 +439,12 @@ Arrays support element-level selective disclosure using `arrClaim` and `sdArrCla
 val claims = SdJwtClaims {
     claim("sub", "user-1234")
     arrClaim("nationalities") {              // Array visible in payload
-        addClaim("US")                       // Element always visible
-        addSdClaim("DE")                     // Element selectively disclosable
+        claim("US")                       // Element always visible
+        sdClaim("DE")                     // Element selectively disclosable
     }
     sdArrClaim("phone_numbers") {            // Entire array is disclosable
-        addClaim("+1-555-0100")
-        addSdClaim("+49-170-0000000")        // Nested element also disclosable
+        claim("+1-555-0100")
+        sdClaim("+49-170-0000000")        // Nested element also disclosable
     }
 }
 ```
@@ -449,10 +462,10 @@ val claims = SdJwtClaims {
 
 | Array Builder | Description |
 |---|---|
-| `addClaim(value)` | Cleartext array element |
-| `addSdClaim(value)` | Selectively disclosable array element |
-| `addObjClaim { }` | Cleartext nested object as array element |
-| `addSdObjClaim { }` | Disclosable nested object as array element |
+| `claim(value)` | Cleartext array element |
+| `sdClaim(value)` | Selectively disclosable array element |
+| `objClaim { }` | Cleartext nested object as array element |
+| `sdObjClaim { }` | Disclosable nested object as array element |
 
 ## Decoy Digests
 
@@ -479,7 +492,7 @@ val claims = SdJwtClaims(minimumDigests = 5) {
 
     arrClaim("nationalities", minimumDigests = 3) {
         // Array will have at least 3 {...} digest wrappers
-        addSdClaim("US")
+        sdClaim("US")
     }
 }
 ```
